@@ -4,6 +4,7 @@ from PyQt5.QtGui import QIntValidator, QIcon, QImage, QFont, QPixmap
 from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal
 import cv2
 
+
 class App(QWidget):
     def __init__(self):
         super(App, self).__init__()
@@ -75,7 +76,7 @@ class App(QWidget):
 
         self.resultbox = QGroupBox("Results")
         self.resultbox.setCheckable(False)
-        self.resultbox.setMaximumSize(600,450)
+        self.resultbox.setMaximumSize(600, 450)
         self.result_layout = QVBoxLayout()
         self.result_layout.setAlignment(Qt.AlignTop)
         self.result_layout.setSpacing(30)
@@ -154,7 +155,7 @@ class App(QWidget):
         zoom_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.zoom_value_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.zoom_slider = QSlider()
-        self.zoom_slider.setMaximumSize(100,10)
+        self.zoom_slider.setMaximumSize(100, 10)
         self.zoom_slider.setOrientation(Qt.Horizontal)
         self.zoom_slider.setTickPosition(QSlider.TicksBelow)
         self.zoom_slider.setTickInterval(5)
@@ -171,7 +172,7 @@ class App(QWidget):
 
         # Layout 5
         self.take_picture = QPushButton("Take Snap")
-        self.take_picture.setMaximumSize(100,30)
+        self.take_picture.setMaximumSize(100, 30)
         self.take_picture.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.take_picture.clicked.connect(self.take_Snap)
 
@@ -240,7 +241,7 @@ class App(QWidget):
             count = self.count_dialog.text()
             self.count = self.count + int(count)
         else:
-            self.count+=1
+            self.count += 1
 
         # Save Image
         image = self.worker.get_image()
@@ -254,7 +255,7 @@ class App(QWidget):
         self.saved_in_as.setText(f'{self.folder_path}/{name}_{self.count}.jpeg')
 
         # Display the image
-        image_dummy= QPixmap(f'{self.folder_path}/{name}_{self.count}.jpeg').scaled(450, 250, Qt.KeepAspectRatio)
+        image_dummy = QPixmap(f'{self.folder_path}/{name}_{self.count}.jpeg').scaled(450, 250, Qt.KeepAspectRatio)
         self.show_image.setPixmap(image_dummy)
 
     def stop_Feed(self):
@@ -290,13 +291,14 @@ class App(QWidget):
         # Add to Main Layout
         self.main_layout.addLayout(self.heading_layout)
 
+
 class Worker(QThread):
     image_update = pyqtSignal(QImage)
 
     def __init__(self, n):
         super(Worker, self).__init__()
         self.n = n
-        self.scale=1
+        self.scale = 1
         self.rect = QRect()
 
     def run(self):
@@ -306,13 +308,31 @@ class Worker(QThread):
             ret, frame = capture.read()
             if ret:
                 img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                flipped_img = cv2.flip(img,1)
+                flipped_img = cv2.flip(img, 1)
+                flipped_img = self.zoom_Image(flipped_img)
                 to_qt = QImage(flipped_img.data, flipped_img.shape[1], flipped_img.shape[0], QImage.Format_RGB888)
                 pic = to_qt.scaled(640, 720, Qt.KeepAspectRatio)
-                print(self.scale)
                 copy_to_qt = to_qt.copy(self.rect.x(), self.rect.y(), to_qt.width(), to_qt.height())
                 self.image_update.emit(pic)
                 self.send_image(copy_to_qt)
+
+
+    def zoom_Image(self, img):
+        # Get the size of image
+        y_size = img.shape[0]
+        x_size = img.shape[1]
+
+        # Crop Coordinates to the area of zoom
+        x1 = int(0.5 * x_size * (1 - 1 / self.scale))
+        y1 = int(0.5 * y_size * (1 - 1 / self.scale))
+        x2 = int(x_size - 0.5 * x_size * (1 - 1 / self.scale))
+        y2 = int(y_size - 0.5 * y_size * (1 - 1 / self.scale))
+
+        # Crop the Image
+        crop_img = img[y1:y2, x1:x2]
+
+        # Return Zoomed Image
+        return cv2.resize(crop_img, None, fx=self.scale, fy=self.scale, interpolation="INTER_LANCZOS4")
 
     def send_image(self, x):
         self.copy_image = x
